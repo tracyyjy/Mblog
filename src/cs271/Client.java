@@ -20,8 +20,8 @@ public class Client {
 
         ArrayList<Message> messages = new ArrayList<Message>();
 
-        Replica[] cluster = new Replica[3];
-        for (int i = 0; i < cluster.length; i++) cluster[i] = new Replica(i);
+        Node[] cluster = new Node[3];
+        for (int i = 0; i < cluster.length; i++) cluster[i] = new Node(i);
 
         Scanner scanner = new Scanner(in);
         out.println("\nPlease command or exit");
@@ -52,21 +52,21 @@ public class Client {
         }
     }
 
-    public static void increment (int replicaId, String key, Replica[] cluster ){
+    public static void increment (int replicaId, String key, Node[] cluster ){
         cluster[replicaId].operate(key, "increment");
     }
 
-    public static void decrement(int replicaId, String key, Replica[] cluster){
+    public static void decrement(int replicaId, String key, Node[] cluster){
         cluster[replicaId].operate(key, "decrement");
     }
 
-    public static void getValue(int replicaId, String key, Replica[] cluster){
+    public static void getValue(int replicaId, String key, Node[] cluster){
         if (cluster[replicaId].dict.containsKey(key))
             out.println(key + " => " + cluster[replicaId].dict.get(key));
         else out.println("NULL. Key does not exist!");
     }
 
-    public static void printState(int replicaId, Replica[] cluster){
+    public static void printState(int replicaId, Node[] cluster){
 
         String kvStrings = "";
         for (String k: cluster[replicaId].dict.keySet()){
@@ -85,7 +85,7 @@ public class Client {
         out.println("|" + cluster[replicaId].TimeTable[2][0] + " " + cluster[replicaId].TimeTable[2][1] + " " + cluster[replicaId].TimeTable[2][2] + "|");
     }
 
-    public static void send(int sourceReplicaId, int destReplicaId, Replica[] cluster, ArrayList<Message> messages) {
+    public static void send(int sourceReplicaId, int destReplicaId, Node[] cluster, ArrayList<Message> messages) {
         Message m = new Message(sourceReplicaId, destReplicaId);
         for (Event event: cluster[sourceReplicaId].Log){
             if (!hasrec(sourceReplicaId, event, destReplicaId, cluster)) m.NP.add(event);
@@ -97,10 +97,10 @@ public class Client {
         out.println("transmission number: " + (messages.size()-1));
     }
 
-    public static void receive(int transmissionNumber, Replica[] cluster, ArrayList<Message> messages) {
+    public static void receive(int transmissionNumber, Node[] cluster, ArrayList<Message> messages) {
         try {
             Message m = messages.get(transmissionNumber);
-            Replica dst = cluster[m.destReplicaId];
+            Node dst = cluster[m.destReplicaId];
             ArrayList<Event> NE = new ArrayList<Event>();
 
             for (Event event: m.NP){
@@ -138,7 +138,7 @@ public class Client {
         }
     }
 
-    public static boolean hasrec (int nodeId_i, Event eR, int nodeId_k, Replica[] cluster) {
+    public static boolean hasrec (int nodeId_i, Event eR, int nodeId_k, Node[] cluster) {
         return (cluster[nodeId_i].TimeTable[nodeId_k][eR.nodeId] >= eR.time);
     }
 }

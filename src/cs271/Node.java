@@ -11,7 +11,7 @@ import java.util.Map;
  * Time: 10:57 AM
  * To change this template use File | Settings | File Templates.
  */
-public class Replica {
+public class Node {
 
     private int Clock;
     public ArrayList<Event> Log;
@@ -20,7 +20,7 @@ public class Replica {
     public int[][] TimeTable;
     public Map<String, Integer> dict = new HashMap<String, Integer>();
 
-    public Replica(int id){
+    public Node(int id){
         ID = id;
         Clock = 0;
         Log = new ArrayList<Event>();
