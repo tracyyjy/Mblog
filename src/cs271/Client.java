@@ -1,32 +1,51 @@
 package cs271;
-import java.util.*;
-import java.util.regex.*;
 
-import static java.lang.System.*;
+import java.net.InetAddress;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.net.Socket;
+import static java.lang.System.in;
+import static java.lang.System.out;
+
+/**
+ * Created with IntelliJ IDEA.
+ * User: Photeinis
+ * Date: 11/15/13
+ * Time: 11:34 AM
+ * To change this template use File | Settings | File Templates.
+ */
 
 public class Client {
 
-    public static void main(String[] args) {
-        out.println("This is a simulated distributed logging program.");
-        out.println("\nCommand: function para1 para2");
-        out.println("Example: decrement(2, name)");
-        out.println("Options: replicaId = [0-2]; Key = [a-zA-Z_0-9]+; DON'T wrap keys with \"\"; non-existent keys will be created.");
-        out.println("      1: increment replicaId Key");
-        out.println("      2: decrement replicaId Key");
-        out.println("      3: getValue replicaId Key");
-        out.println("      4: printState replicaId");
-        out.println("      5: sendLog sourceReplicaId destReplicaId");
-        out.println("      6: receiveLog transmissionNumber ");
+    private Socket socket;
+    private BufferedReader tcp_in;
+    private PrintWriter tcp_out;
 
-        ArrayList<Message> messages = new ArrayList<Message>();
+    public Client() throws IOException{
 
-        Node[] cluster = new Node[3];
-        for (int i = 0; i < cluster.length; i++) cluster[i] = new Node(i);
+        // Make connection and initialize streams
+        socket = new Socket(InetAddress.getLocalHost(), 9898);
+        tcp_in = new BufferedReader(
+                new InputStreamReader(socket.getInputStream()));
+        tcp_out = new PrintWriter(socket.getOutputStream(), true);
+        // Consume the initial welcoming messages from the server
+        for (int i = 0; i < 1; i++) {
+            out.println(tcp_in.readLine());
+        }
 
+    }
+
+
+    public void run(){
         Scanner scanner = new Scanner(in);
-        out.println("\nPlease command or exit");
         String command = scanner.nextLine();
-        Pattern pattern = Pattern.compile("[a-zA-Z](\\s+)(\\d+)(\\s*)(\\w*)");
+        Pattern pattern = Pattern.compile("[a-z]+\\s*(\".*\")*\\s*");
 
         while (!command.equals("exit")){
             Matcher m = pattern.matcher(command);
@@ -34,111 +53,49 @@ public class Client {
             try {
                 if (m.find()) {
                     String[] commArray = command.split("\\s+");
-                    if (commArray[0].equals("increment"))           increment(Integer.parseInt(commArray[1]), commArray[2], cluster);
-                    else if (commArray[0].equals("decrement"))      decrement(Integer.parseInt(commArray[1]), commArray[2], cluster);
-                    else if (commArray[0].equals("getValue"))       getValue (Integer.parseInt(commArray[1]), commArray[2], cluster);
-                    else if (commArray[0].equals("printState"))     printState(Integer.parseInt(commArray[1]), cluster);
-                    else if (commArray[0].equals("sendLog"))        send(Integer.parseInt(commArray[1]), Integer.parseInt(commArray[2]), cluster, messages);
-                    else if (commArray[0].equals("receiveLog"))     receive(Integer.parseInt(commArray[1]), cluster, messages);
+                    if (commArray[0].equals("post"))           {
+                        String[] commArray2 = command.split("\"");
+                        String tweet = commArray2[1];
+                        sendCommand("post", tweet);
+                    }
+                    else if (commArray[0].equals("read"))      sendCommand("read", "");
+                    else if (commArray[0].equals("fail"))       sendCommand("fail", "");
+                    else if (commArray[0].equals("unfail"))     sendCommand("unfail", "");
                     else out.println("Invalid function or parameters!");
                 }
-                else out.println("Invalid function or parameters!");
+                else out.println("not found! Invalid function or parameters!");
             } catch (ArrayIndexOutOfBoundsException ex){
-                out.println("Invalid function or parameters!");
+                out.println("exception! Invalid function or parameters!");
             }
 
-            out.println("\nPlease command:");
+            out.println("\nPlease command or exit:");
             command = scanner.nextLine();
         }
     }
 
-    public static void increment (int replicaId, String key, Node[] cluster ){
-        cluster[replicaId].operate(key, "increment");
+    public void instruct() throws IOException{
+        out.println("This is a distributed micro blog client.");
+        out.println("\n" +
+                "Command: function [para]");
+        out.println("Example: post \"testString\"");
+        out.println("      1: post tweet (wrap tweet with \"\")");
+        out.println("      2: read");
+        out.println("      3: fail");
+        out.println("      4: unfail");
+        out.println("\nPlease command or exit");
+
     }
 
-    public static void decrement(int replicaId, String key, Node[] cluster){
-        cluster[replicaId].operate(key, "decrement");
+    public void sendCommand(String func, String para){
+        tcp_out.println(func);
+        tcp_out.println(para);
     }
 
-    public static void getValue(int replicaId, String key, Node[] cluster){
-        if (cluster[replicaId].dict.containsKey(key))
-            out.println(key + " => " + cluster[replicaId].dict.get(key));
-        else out.println("NULL. Key does not exist!");
+    public static void main(String[] args) throws IOException {
+
+        Client client = new Client();
+        client.instruct();
+        client.run();
     }
 
-    public static void printState(int replicaId, Node[] cluster){
-
-        String kvStrings = "";
-        for (String k: cluster[replicaId].dict.keySet()){
-            kvStrings+= k + " => " + cluster[replicaId].dict.get(k) + "\n";
-        }
-
-        String logStrings = "";
-        for (Event e: cluster[replicaId].Log)
-            logStrings += "\"" + e.op + " " + e.key + "\" ";
-
-        out.println(kvStrings);
-        out.println("Log: { " + logStrings + "}\n");
-        out.println("TimeTable:");
-        out.println("|" + cluster[replicaId].TimeTable[0][0] + " " + cluster[replicaId].TimeTable[0][1] + " " + cluster[replicaId].TimeTable[0][2] + "|");
-        out.println("|" + cluster[replicaId].TimeTable[1][0] + " " + cluster[replicaId].TimeTable[1][1] + " " + cluster[replicaId].TimeTable[1][2] + "|");
-        out.println("|" + cluster[replicaId].TimeTable[2][0] + " " + cluster[replicaId].TimeTable[2][1] + " " + cluster[replicaId].TimeTable[2][2] + "|");
-    }
-
-    public static void send(int sourceReplicaId, int destReplicaId, Node[] cluster, ArrayList<Message> messages) {
-        Message m = new Message(sourceReplicaId, destReplicaId);
-        for (Event event: cluster[sourceReplicaId].Log){
-            if (!hasrec(sourceReplicaId, event, destReplicaId, cluster)) m.NP.add(event);
-        }
-        for (int i = 0; i < m.TimeTable.length; i++) {
-            m.TimeTable[i] = cluster[sourceReplicaId].TimeTable[i].clone();
-        }
-        messages.add(m);
-        out.println("transmission number: " + (messages.size()-1));
-    }
-
-    public static void receive(int transmissionNumber, Node[] cluster, ArrayList<Message> messages) {
-        try {
-            Message m = messages.get(transmissionNumber);
-            Node dst = cluster[m.destReplicaId];
-            ArrayList<Event> NE = new ArrayList<Event>();
-
-            for (Event event: m.NP){
-                if (!hasrec(m.destReplicaId,event,m.destReplicaId, cluster)) NE.add(event);
-            }
-            // Update Dict
-            for (Event event: NE) dst.update(event.key, event.op);
-            // Update TimeTable
-            for (int i = 0; i < dst.TimeTable.length; i++){
-                dst.TimeTable[m.destReplicaId][i] = Math.max(dst.TimeTable[m.destReplicaId][i], m.TimeTable[m.sourceReplicaId][i]);
-            }
-            for (int i = 0; i < dst.TimeTable.length; i++){
-                for (int j = 0; j < dst.TimeTable[0].length; j++){
-                    dst.TimeTable[i][j] = Math.max(dst.TimeTable[i][j], m.TimeTable[i][j]);
-                }
-            }
-            // Update Log
-            for (Event event: NE) if (!dst.Log.contains(event)) dst.Log.add(event);
-            ArrayList<Event> toRemoveList = new ArrayList<Event>();
-            for (Event event: dst.Log) {
-                boolean knownToAll = true;
-                for ( int j = 0; j < dst.TimeTable[0].length; j++){
-                    if (!hasrec(m.destReplicaId, event, j, cluster))
-                    {
-                        knownToAll = false;
-                        break;
-                    }
-                }
-                if (knownToAll) toRemoveList.add(event);
-            }
-            dst.Log.removeAll(toRemoveList);
-
-        } catch (IndexOutOfBoundsException ex){
-            out.println("Incorrect transmission number!");
-        }
-    }
-
-    public static boolean hasrec (int nodeId_i, Event eR, int nodeId_k, Node[] cluster) {
-        return (cluster[nodeId_i].TimeTable[nodeId_k][eR.nodeId] >= eR.time);
-    }
 }

@@ -1,4 +1,4 @@
-package cs271;
+package cs271.HW1;
 
 /**
  * Created with IntelliJ IDEA.

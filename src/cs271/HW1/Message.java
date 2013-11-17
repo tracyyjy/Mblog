@@ -1,4 +1,4 @@
-package cs271;
+package cs271.HW1;
 
 import java.util.ArrayList;
 

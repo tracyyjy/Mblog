@@ -1,65 +1,42 @@
 package cs271;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 /**
  * Created with IntelliJ IDEA.
  * User: Photeinis
- * Date: 10/21/13
- * Time: 10:57 AM
+ * Date: 11/15/13
+ * Time: 11:34 AM
  * To change this template use File | Settings | File Templates.
  */
 public class Node {
 
-    private int Clock;
-    public ArrayList<Event> Log;
+    public ArrayList<String> Tweets = new ArrayList<String>();
+    private Server server;
+    ServerSocket listener = new ServerSocket(9898);
 
-    public int ID;
-    public int[][] TimeTable;
-    public Map<String, Integer> dict = new HashMap<String, Integer>();
-
-    public Node(int id){
-        ID = id;
-        Clock = 0;
-        Log = new ArrayList<Event>();
-        TimeTable = new int[3][3];
+    public Node() throws IOException{
+        server = new Server(this, listener);
     }
 
-    public int clock(){
-        Clock++;
-        return Clock;
+    private static void log(String message) {
+        System.out.println(message);
     }
 
-    public void operate(String key, String op){
-        TimeTable[ID][ID] = clock();
-        Log.add(new Event(key, op, TimeTable[ID][ID], ID));
-        if (op.equals("increment"))
-            increment(key);
-        else if (op.equals("decrement"))
-            decrement(key);
-    }
-
-    public void update(String key, String op){
-        if (op.equals("increment"))
-            increment(key);
-        else if (op.equals("decrement"))
-            decrement(key);
-    }
-
-    private void increment(String key){
-        if (dict.containsKey(key))
-            dict.put(key, dict.get(key)+1);
-        else
-            dict.put(key, Integer.valueOf(1));
-    }
-
-    private void decrement(String key){
-        if (dict.containsKey(key))
-            dict.put(key, dict.get(key)-1);
-        else
-            dict.put(key, Integer.valueOf(-1));
+    public static void main(String[] args) throws IOException {
+        log("thread0");
+        Node node = new Node();
+        log("thread1");
+        Thread serverThread  = new Thread(node.server);
+        log("thread2");
+        serverThread.start();
+        log("thread3");
     }
 
 }
