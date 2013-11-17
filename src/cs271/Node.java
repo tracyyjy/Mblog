@@ -30,13 +30,9 @@ public class Node {
     }
 
     public static void main(String[] args) throws IOException {
-        log("thread0");
         Node node = new Node();
-        log("thread1");
         Thread serverThread  = new Thread(node.server);
-        log("thread2");
         serverThread.start();
-        log("thread3");
     }
 
 }

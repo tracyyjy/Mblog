@@ -28,9 +28,8 @@ public class Server implements Runnable{
         try {
             while (true){
                 this.socket = listener.accept();
-                // Decorate the streams so we can send characters
-                // and not just bytes.  Ensure output is flushed
-                // after every newline.
+                log("new connection established!");
+
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(socket.getInputStream()));
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
@@ -42,11 +41,14 @@ public class Server implements Runnable{
                 while (true) {
                     String func = in.readLine();
                     String para = in.readLine();
+                    if (func == null) {
+                        break;
+                    }
                     if (func.equals("post")) {
                         node.Tweets.add(para);
                     }
                     else if (func.equals("read")){
-                        out.println(node.Tweets.get(node.Tweets.size()));
+                        System.out.println(node.Tweets.get(node.Tweets.size()-1));
                     }
                 }
             }
