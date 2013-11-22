@@ -46,9 +46,11 @@ public class Server implements Runnable{
                     }
                     if (func.equals("post")) {
                         node.Tweets.add(para);
+                        System.out.println("receive: "+ para);
                     }
                     else if (func.equals("read")){
                         System.out.println(node.Tweets.get(node.Tweets.size()-1));
+                        out.println(node.Tweets.get(node.Tweets.size()-1));
                     }
                 }
             }
