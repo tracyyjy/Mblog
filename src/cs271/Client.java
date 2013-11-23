@@ -35,9 +35,10 @@ public class Client {
                 new InputStreamReader(socket.getInputStream()));
         tcp_out = new PrintWriter(socket.getOutputStream(), true);
         // Consume the initial welcoming messages from the server
-        for (int i = 0; i < 1; i++) {
-            out.println(tcp_in.readLine());
-        }
+//        for (int i = 0; i < 1; i++) {
+//            out.println(tcp_in.readLine());
+//        }
+        out.println(tcp_in.readLine());
 
     }
 
@@ -70,6 +71,15 @@ public class Client {
 
             out.println("\nPlease command or exit:");
             command = scanner.nextLine();
+            try{
+                out.println(tcp_in.readLine());
+            }
+            catch(IOException i)
+            {
+                i.printStackTrace();
+            }
+
+
         }
     }
 
@@ -90,6 +100,8 @@ public class Client {
         tcp_out.println(func);
         tcp_out.println(para);
     }
+
+
 
     public static void main(String[] args) throws IOException {
 
