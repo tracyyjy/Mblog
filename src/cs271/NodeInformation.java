@@ -1,5 +1,7 @@
 package cs271;
 
+import java.io.Serializable;
+
 /**
  * Created with IntelliJ IDEA.
  * User: Photeinis
@@ -7,16 +9,15 @@ package cs271;
  * Time: 11:35 PM
  * To change this template use File | Settings | File Templates.
  */
-import java.io.Serializable;
 
-public class PeerInformation implements Serializable
+public class NodeInformation implements Serializable
 {
     private String host;
     private int port;
     private int num;
     private boolean isLeader;
 
-    public PeerInformation(String host, int port, int num)
+    public NodeInformation(String host, int port, int num)
     {
         this.host = host;
         this.port = port;

@@ -11,8 +11,9 @@ public class AcceptConfirmMessage extends Message
 {
     private Proposal proposal;
 
-    public AcceptConfirmMessage(Proposal proposal)
+    public AcceptConfirmMessage(int position, Proposal proposal)
     {
+        this.position = position;
         this.proposal = proposal;
     }
 

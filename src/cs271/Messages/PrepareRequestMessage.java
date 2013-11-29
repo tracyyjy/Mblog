@@ -9,22 +9,16 @@ package cs271.Messages;
  */
 public class PrepareRequestMessage extends Message
 {
-    private int csn;
-    private int psn;
+    private int BallotNumber;
 
-    public PrepareRequestMessage(int csn, int psn)
+    public PrepareRequestMessage(int round, int BallotNumber)
     {
-        this.csn = csn;
-        this.psn = psn;
+        this.position = round;
+        this.BallotNumber = BallotNumber;
     }
 
-    public int getPsn()
+    public int getBallotNumber()
     {
-        return psn;
-    }
-
-    public int getCsn()
-    {
-        return csn;
+        return BallotNumber;
     }
 }

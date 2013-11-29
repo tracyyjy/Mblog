@@ -42,7 +42,6 @@ public class Client {
 
     }
 
-
     public void run(){
         Scanner scanner = new Scanner(in);
         String command = scanner.nextLine();
@@ -100,8 +99,6 @@ public class Client {
         tcp_out.println(func);
         tcp_out.println(para);
     }
-
-
 
     public static void main(String[] args) throws IOException {
 

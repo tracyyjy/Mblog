@@ -11,11 +11,16 @@ public class PrepareResponseMessage extends Message
 {
     private int BallotNumber;
     private Proposal proposal;
+    private boolean promised;
+    private boolean accepted;
 
-    public PrepareResponseMessage(int BallotNumber, Proposal proposal)
+    public PrepareResponseMessage(int position, int BallotNumber, boolean promised, boolean accepted, Proposal proposal)
     {
+        this.position = position;
         this.proposal = proposal;
         this.BallotNumber = BallotNumber;
+        this.promised = promised;
+        this.accepted = accepted;
     }
 
     public Proposal getProposal()
@@ -26,5 +31,15 @@ public class PrepareResponseMessage extends Message
     public int getBallotNumber()
     {
         return BallotNumber;
+    }
+
+    public boolean getPromised()
+    {
+        return promised;
+    }
+
+    public boolean getAccepted()
+    {
+        return accepted;
     }
 }

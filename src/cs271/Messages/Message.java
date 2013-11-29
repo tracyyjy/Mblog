@@ -1,6 +1,6 @@
 package cs271.Messages;
 
-import cs271.PeerInformation;
+import cs271.NodeInformation;
 
 import java.io.Serializable;
 
@@ -14,25 +14,31 @@ import java.io.Serializable;
 
 public abstract class Message implements Serializable
 {
-    protected PeerInformation sender;
-    protected PeerInformation receiver;
+    protected int position;
+    protected NodeInformation sender;
+    protected NodeInformation receiver;
 
-    public PeerInformation getSender()
+    public int getPosition()
+    {
+        return position;
+    }
+
+    public NodeInformation getSender()
     {
         return sender;
     }
 
-    public void setSender(PeerInformation sender)
+    public void setSender(NodeInformation sender)
     {
         this.sender = sender;
     }
 
-    public PeerInformation getReceiver()
+    public NodeInformation getReceiver()
     {
         return receiver;
     }
 
-    public void setReceiver(PeerInformation receiver)
+    public void setReceiver(NodeInformation receiver)
     {
         this.receiver = receiver;
     }

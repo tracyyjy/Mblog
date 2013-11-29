@@ -14,7 +14,8 @@ import java.net.Socket;
  * Time: 4:21 PM
  * To change this template use File | Settings | File Templates.
  */
-public class Server implements Runnable{
+
+public class Server extends Thread{
     private Node node;
     private Socket socket;
     private ServerSocket listener;
@@ -45,21 +46,25 @@ public class Server implements Runnable{
                         break;
                     }
                     if (func.equals("post")) {
-                        node.Tweets.add(para);
-                        System.out.println("receive: "+ para);
+                        node.propose(para);
+                        /*node.Tweets.add(para);
+                        System.out.println("receive: "+ para);*/
                     }
                     else if (func.equals("read")){
-                        System.out.println(node.Tweets.get(node.Tweets.size()-1));
-                        out.println(node.Tweets.get(node.Tweets.size()-1));
+                        /*System.out.println(node.Tweets.get(node.Tweets.size()-1));
+                        out.println(node.Tweets.get(node.Tweets.size()-1));*/
                     }
                 }
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             log("Error handling client ");
-        } finally {
+        }
+        finally {
             try {
                 socket.close();
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
                 log("Couldn't close a socket, what's going on?");
             }
             log("Connection with client closed");

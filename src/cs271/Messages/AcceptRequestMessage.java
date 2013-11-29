@@ -11,8 +11,9 @@ public class AcceptRequestMessage extends Message
 {
     private Proposal proposal;
 
-    public AcceptRequestMessage(Proposal proposal)
+    public AcceptRequestMessage(int position, Proposal proposal)
     {
+        this.position = position;
         this.proposal = proposal;
     }
 

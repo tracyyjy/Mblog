@@ -12,25 +12,25 @@ import java.io.Serializable;
 
 public class Proposal implements Serializable
 {
+    private int position;
     private int BallotNumber;
-    private int key;
     private String value;
 
-    public Proposal(int BallotNumber, int key, String value)
+    public Proposal(int position, int BallotNumber, String value)
     {
+        this.position = position;
         this.BallotNumber = BallotNumber;
-        this.key = key;
         this.value = value;
+    }
+
+    public int getPosition()
+    {
+        return position;
     }
 
     public int getBallotNumber()
     {
         return BallotNumber;
-    }
-
-    public int getKey()
-    {
-        return key;
     }
 
     public String getValue()
@@ -40,7 +40,7 @@ public class Proposal implements Serializable
 
     public String toString()
     {
-        return "{" + BallotNumber + ", " + key + ", " + value + "}";
+        return "{" + position + ", " + BallotNumber + ", " + value + "}";
     }
 }
 
