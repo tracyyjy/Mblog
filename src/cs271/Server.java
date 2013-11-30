@@ -1,9 +1,9 @@
 package cs271;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import cs271.Messages.ClientMessage;
+import cs271.Messages.ServerMessage;
+
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -19,6 +19,8 @@ public class Server extends Thread{
     private Node node;
     private Socket socket;
     private ServerSocket listener;
+    ObjectInputStream in;
+    ObjectOutputStream out;
 
     public Server(Node node, ServerSocket listener) {
         this.node = node;
@@ -26,48 +28,79 @@ public class Server extends Thread{
     }
 
     public void run() {
-        try {
-            while (true){
-                this.socket = listener.accept();
-                log("new connection established!");
+        while (true){
+            try {
+                while (true){
+                    this.socket = listener.accept();
+                    log("Server: new connection established!");
 
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream()));
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-
-                // Send a welcome message to the client.
-                out.println("Server connected, Node at your service.");
-
-                // Get commands from the client, line by line. Then execute.
-                while (true) {
-                    String func = in.readLine();
-                    String para = in.readLine();
-                    if (func == null) {
-                        break;
+                    try{
+                        out = new ObjectOutputStream(socket.getOutputStream());
+                    }   catch( IOException e){
+                        log("IOException while trying to get ObjectOutputStream!");
                     }
-                    if (func.equals("post")) {
-                        node.propose(para);
-                        /*node.Tweets.add(para);
-                        System.out.println("receive: "+ para);*/
+
+                    // send a welcome message to the client.
+                    sendToClient("Server connected, node at your service.");
+
+                    try{
+                        in =  new ObjectInputStream(socket.getInputStream());
+                    }  catch (IOException e){
+                        log("IOException while trying to get ObjectInputStream!");
                     }
-                    else if (func.equals("read")){
-                        /*System.out.println(node.Tweets.get(node.Tweets.size()-1));
-                        out.println(node.Tweets.get(node.Tweets.size()-1));*/
+
+                    // execute client commands
+                    while (true) {
+                        try {
+                            checkout((ClientMessage) in.readObject());
+                        } catch (ClassNotFoundException e) {
+                            log("ClassNotFoundException while trying to read client message object!");
+                        }
                     }
                 }
+            }  catch ( IOException e) {
+                log("IOException while checking out message!");
+            }  finally {
+                try {
+                    socket.close();
+                }
+                catch (IOException e) {
+                    log("Couldn't close a socket, what's going on?");
+                }
+                log("Connection with client closed");
             }
         }
-        catch (IOException e) {
-            log("Error handling client ");
+    }
+
+    private void checkout(ClientMessage message){
+        if (message != null){
+            String function = message.getFunction();
+            if (function.equals("post")) {
+                node.propose(message.getArgument());
+                log("post received, voting...");
+            }
+            else if (function.equals("read")){
+                sendToClient(node.getTweets());
+            }
+            else if (function.equals("fail")){
+                node.fail();
+                sendToClient("node failed");
+            }
+            else if (function.equals("unfail")){
+                node.recover();
+                sendToClient("node recovered");
+            }
+        else
+            log("Unknown client message received!");
         }
-        finally {
-            try {
-                socket.close();
-            }
-            catch (IOException e) {
-                log("Couldn't close a socket, what's going on?");
-            }
-            log("Connection with client closed");
+    }
+
+    public void sendToClient(String message){
+        try {
+            out.writeObject(new ServerMessage(message));
+            out.flush();
+        } catch (IOException e) {
+            log("Exception while sending message to client!");
         }
     }
 

@@ -24,7 +24,7 @@ public class Node {
     private static final int proposeTimeout = 10000;
 
     // Node Data
-    private Map<Integer, String> Tweets;
+    private TreeMap<Integer, String> Tweets;
 
     private Server server;
     private ServerSocket clientListener;
@@ -55,7 +55,7 @@ public class Node {
     public Node(int port, int siteNum) throws IOException{
 
         // initialize local and cluster information
-        this.Tweets = new HashMap<Integer, String>();
+        this.Tweets = new TreeMap<Integer, String>();
         this.nodeInformation = new NodeInformation("localhost", port, siteNum);
         this.cluster = new HashSet<NodeInformation>();
         this.knowCluster();
@@ -71,7 +71,7 @@ public class Node {
         this.isRunning = false;
 
         // register C/S server socket
-        clientListener = new ServerSocket(9898);
+        clientListener = new ServerSocket(9900 + nodeInformation.getNum());
         server = new Server(this, clientListener);
         server.start();
 
@@ -79,19 +79,9 @@ public class Node {
         peerListener = new Agent();
         peerListener.start();
 
-        for (NodeInformation node: cluster){
-            if (node == nodeInformation) continue;
-        }
-
         isRunning = true;
 
         log("Node " + nodeInformation.getNum() + " started");
-    }
-
-    public void knowCluster() {
-        for (int i = 0; i < 5; i++) {
-            this.cluster.add(new NodeInformation("localhost", 9903 + i, i));
-        }
     }
 
     public synchronized void fail() {
@@ -108,6 +98,16 @@ public class Node {
         *
         *
         * */
+    }
+
+    public String getTweets(){
+        String string;
+        string = new String();
+        for (Map.Entry entry: Tweets.entrySet()){
+            String tmp = entry.getKey() + ": " + entry.getValue() + "\n";
+            string += tmp;
+        }
+        return string;
     }
 
     public void propose(String value) {
@@ -132,6 +132,13 @@ public class Node {
 
         // send Phase1 prepare request to all with position & ballot number
         broadcast(new PrepareRequestMessage(position, ballotNumber));
+    }
+
+    private void knowCluster() {
+        for (int i = 0; i < 2; i++) {
+            this.cluster.add(new NodeInformation("localhost", 9905 + i, i));
+        }
+        log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNum() + " at " + nodeInformation.getHost() + ": " +nodeInformation.getPort());
     }
 
     private void broadcast(Message m) {
@@ -162,6 +169,7 @@ public class Node {
         try
         {
             socket = new Socket(node.getHost(), node.getPort());
+            log("socket connected!");
             socket.setSoTimeout(socketTimeout);
             out = new ObjectOutputStream(socket.getOutputStream());
             out.writeObject(m);
@@ -189,7 +197,9 @@ public class Node {
                 if(socket != null)
                     socket.close();
             }
-            catch(IOException e){}
+            catch(IOException e){
+
+            }
         }
     }
 
@@ -313,10 +323,11 @@ public class Node {
             n++;
 
             // if recently learned from a quorum
-            if(n > (cluster.size() / 2))
-            {
+            if(n > (cluster.size() / 2)) {
                 chosenValues.put(position, acceptedProposal.getValue());
                 writeDebug("Learned: " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
+                Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
+                server.sendToClient("value accepted");
             }
             else
                 numAcceptances.put(position, n);
@@ -345,7 +356,6 @@ public class Node {
         int port = Integer.parseInt(args[0]);
         int siteNum = Integer.parseInt(args[1]);
         Node node = new Node(port, siteNum);
-
     }
 
     /* Agent class assumes the role of Proposer/Acceptor*/
@@ -353,60 +363,42 @@ public class Node {
         private boolean isRunning;
         private ServerSocket serverSocket;
 
-        public Agent()
-        {
+        public Agent() {
             isRunning = true;
-            try
-            {
+            try {
                 serverSocket = new ServerSocket(nodeInformation.getPort());
-            }
-            catch(IOException e)
-            {
+            } catch(IOException e) {
                 writeDebug("IOException while trying to listen!", true);
             }
         }
 
-        public void run()
-        {
+        public void run() {
             Socket socket = null;
             ObjectInputStream in;
-            while(isRunning)
-            {
-                try
-                {
+            while(isRunning) {
+                try {
                     socket = serverSocket.accept();
                     in = new ObjectInputStream(socket.getInputStream());
                     checkout((Message) in.readObject());
-                }
-                catch(IOException e)
+                } catch(IOException e)
                 {
                     writeDebug("IOException while trying to accept connection!", true);
                     e.printStackTrace();
-                }
-                catch(ClassNotFoundException e)
-                {
+                } catch(ClassNotFoundException e) {
                     writeDebug("ClassNotFoundException while trying to read Object!", true);
-                }
-                finally
-                {
-                    try
-                    {
+                } finally {
+                    try {
                         if(socket != null)
                             socket.close();
-                    }
-                    catch(Exception e){}
+                    } catch(Exception e){}
                 }
-            }
-            try
-            {
+            } try {
                 if(serverSocket != null)
                     serverSocket.close();
-            }
-            catch(Exception e){}
+            } catch(Exception e){}
         }
 
-        public void kill()
-        {
+        public void kill() {
             isRunning = false;
         }
     }
@@ -416,19 +408,15 @@ public class Node {
         private long expireTime;
         private Proposal proposal;
 
-        public Proposer(Proposal proposal)
-        {
+        public Proposer(Proposal proposal) {
             this.isRunning = true;
             this.proposal = proposal;
         }
 
-        public void run()
-        {
+        public void run() {
             expireTime = System.currentTimeMillis() + proposeTimeout;
-            while(isRunning)
-            {
-                if(expireTime < System.currentTimeMillis())
-                {
+            while(isRunning) {
+                if(expireTime < System.currentTimeMillis()) {
                     propose(proposal.getValue(), proposal.getPosition());
                     kill();
                 }
@@ -436,11 +424,8 @@ public class Node {
             }
         }
 
-        public void kill()
-        {
+        public void kill() {
             isRunning = false;
         }
-
     }
-
 }

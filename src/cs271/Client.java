@@ -1,17 +1,14 @@
 package cs271;
 
+import cs271.Messages.ClientMessage;
+import cs271.Messages.ServerMessage;
+
+import java.io.*;
 import java.net.InetAddress;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.InputStream;
-import java.io.PrintWriter;
 import java.net.Socket;
-import static java.lang.System.in;
-import static java.lang.System.out;
 
 /**
  * Created with IntelliJ IDEA.
@@ -24,85 +21,108 @@ import static java.lang.System.out;
 public class Client {
 
     private Socket socket;
-    private BufferedReader tcp_in;
-    private PrintWriter tcp_out;
+    private ObjectInputStream in;
+    private ObjectOutputStream out;
 
-    public Client() throws IOException{
+    public Client(int port){
 
         // Make connection and initialize streams
-        socket = new Socket(InetAddress.getLocalHost(), 9898);
-        tcp_in = new BufferedReader(
-                new InputStreamReader(socket.getInputStream()));
-        tcp_out = new PrintWriter(socket.getOutputStream(), true);
-        // Consume the initial welcoming messages from the server
-//        for (int i = 0; i < 1; i++) {
-//            out.println(tcp_in.readLine());
-//        }
-        out.println(tcp_in.readLine());
+        try {
+            socket = new Socket(InetAddress.getLocalHost(), port);
+        } catch (IOException e) {
+            log("Exception connecting to server!");
+        }
 
+        try {
+            in = new ObjectInputStream(socket.getInputStream());
+        } catch (IOException e) {
+            log("Exception when creating client-side input object stream!");
+        }
+
+        try {
+            out = new ObjectOutputStream(socket.getOutputStream());
+            checkout((ServerMessage) in.readObject());
+        } catch (IOException e) {
+            log("Exception when creating client-side output object stream!");
+        } catch (ClassNotFoundException e){
+            log("Exception when reading object from checkout!");
+        }
     }
 
     public void run(){
-        Scanner scanner = new Scanner(in);
+        Scanner scanner = new Scanner(System.in);
         String command = scanner.nextLine();
         Pattern pattern = Pattern.compile("[a-z]+\\s*(\".*\")*\\s*");
 
         while (!command.equals("exit")){
+
+            // parse the command
             Matcher m = pattern.matcher(command);
 
+            // send client message
             try {
                 if (m.find()) {
                     String[] commArray = command.split("\\s+");
                     if (commArray[0].equals("post"))           {
                         String[] commArray2 = command.split("\"");
                         String tweet = commArray2[1];
-                        sendCommand("post", tweet);
+                        out.writeObject(new ClientMessage("post", tweet));
+                        log("post message sent");
                     }
-                    else if (commArray[0].equals("read"))      sendCommand("read", "");
-                    else if (commArray[0].equals("fail"))       sendCommand("fail", "");
-                    else if (commArray[0].equals("unfail"))     sendCommand("unfail", "");
-                    else out.println("Invalid function or parameters!");
+                    else if (commArray[0].equals("read"))
+                        out.writeObject(new ClientMessage("read", ""));
+                    else if (commArray[0].equals("fail"))
+                        out.writeObject(new ClientMessage("fail", ""));
+                    else if (commArray[0].equals("unfail"))
+                        out.writeObject(new ClientMessage("unfail", ""));
+                    else log("Invalid function or parameters!");
+                    out.flush();
                 }
-                else out.println("not found! Invalid function or parameters!");
+                else log("Command pattern not found!");
             } catch (ArrayIndexOutOfBoundsException ex){
-                out.println("exception! Invalid function or parameters!");
+                log("Exception when reading commands!");
+            } catch (IOException ex){
+                log(" Exception when writing command objects");
             }
 
-            out.println("\nPlease command or exit:");
+            // checkout server message
+            try {
+                checkout((ServerMessage) in.readObject());
+            } catch (IOException e) {
+                log("IOException while trying to read server message Object! ");
+            } catch (ClassNotFoundException e) {
+                log("ClassNotFoundException while trying to read server message Object! ");
+            }
+
+            log("\nPlease command or exit:");
             command = scanner.nextLine();
-            try{
-                out.println(tcp_in.readLine());
-            }
-            catch(IOException i)
-            {
-                i.printStackTrace();
-            }
-
-
         }
     }
 
-    public void instruct() throws IOException{
-        out.println("This is a distributed micro blog client.");
-        out.println("\n" +
-                "Command: function [para]");
-        out.println("Example: post \"testString\"");
-        out.println("      1: post tweet (wrap tweet with \"\")");
-        out.println("      2: read");
-        out.println("      3: fail");
-        out.println("      4: unfail");
-        out.println("\nPlease command or exit");
-
+    public void log(String m){
+        System.out.println(m);
     }
 
-    public void sendCommand(String func, String para){
-        tcp_out.println(func);
-        tcp_out.println(para);
+    public void checkout(ServerMessage message){
+        if (message != null) log(message.getMessage());
+        else log("Unknown message received!");
+    }
+
+    public void instruct() throws IOException{
+        log("This is a distributed micro blog client.");
+        log("\n" +
+                "Command: function [para]");
+        log("Example: post \"testString\"");
+        log("      1: post tweet (wrap tweet with \"\")");
+        log("      2: read");
+        log("      3: fail");
+        log("      4: unfail");
+        log("\nPlease command or exit");
+
     }
 
     public static void main(String[] args) throws IOException {
-
-        Client client = new Client();
+        Client client = new Client(Integer.parseInt(args[0]));
         client.instruct();
         client.run();
     }
