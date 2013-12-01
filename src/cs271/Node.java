@@ -32,7 +32,8 @@ public class Node {
 
     private Set<NodeInformation> cluster;
     private NodeInformation nodeInformation;
-    private boolean isRunning;
+    private boolean alive;
+    private boolean healthy;
 
     /* Proposer Variables */
     private int currentProposedPosition;
@@ -51,7 +52,6 @@ public class Node {
 
     /* Learner Variables */
     private Map<Integer, Integer> numAcceptances;
-    private Map<Integer, String> chosenValues;
 
     public Node(int port, int siteNum) throws IOException{
 
@@ -69,8 +69,8 @@ public class Node {
         this.handlers = new HashMap<Integer, ProposalHandler>();
         this.receivedMaxBallotNumber = new HashMap<Integer, Integer>();
         this.acceptedProposals = new HashMap<Integer, Proposal>();
-        this.chosenValues = new HashMap<Integer, String>();
-        this.isRunning = false;
+        this.healthy = false;
+        this.alive = false;
 
         // register C/S server socket
         clientListener = new ServerSocket(9900 + nodeInformation.getNum());
@@ -81,25 +81,27 @@ public class Node {
         peerListener = new Agent();
         peerListener.start();
 
-        isRunning = true;
+        alive = true;
+        healthy = true;
 
         log("Node " + nodeInformation.getNum() + " started");
     }
 
+    public synchronized boolean getStatus(){
+        return alive;
+    }
+
     public synchronized void fail() {
-        /* failure simulation code ?
-        *
-        *
-        *
-        * */
+        /* failure simulation */
+        healthy = false;
+        alive = false;
+        log("**********FAILING**********");
     }
 
     public synchronized void recover() {
-        /* recovery simulation code ?
-        *
-        *
-        *
-        * */
+        /* recovery simulation */
+        alive = true;
+        broadcast(new SosMessage());
     }
 
     public String getTweets(){
@@ -118,7 +120,8 @@ public class Node {
     }
 
     public void propose(String value, int position) {
-        if(!isRunning)
+
+        if(!alive)
             return;
 
         numPromises.put(position, 0);
@@ -130,8 +133,9 @@ public class Node {
         currentProposedBallotNumbers.put(currentProposedPosition, ballotNumber);
 
         // remove possible legacy handler
-        if(handlers.containsKey(position))
-            handlers.remove(position).kill();
+        if(handlers.containsKey(position)) {
+            handlers.remove(position).suicide();
+        }
         // create new proposal and its handler
         Proposal proposal = new Proposal(nodeInformation.getNum(), position, ballotNumber, value);
         proposals.put(position, proposal);
@@ -151,7 +155,7 @@ public class Node {
     }
 
     private void broadcast(Message m) {
-        if(!isRunning)
+        if(!alive)
             return;
 
         m.setSender(nodeInformation);
@@ -168,7 +172,7 @@ public class Node {
     }
 
     private void unicast(NodeInformation node, Message m) {
-        if(!isRunning)
+        if(!alive)
             return;
 
         Socket socket = null;
@@ -213,11 +217,29 @@ public class Node {
     }
 
     private synchronized void checkout(Message m) {
-        if(!isRunning)
+        if(!alive)
             return;
 
+        // receive sos message from a failed peer
+        if (m instanceof SosMessage){
+            SosMessage sosMessage = (SosMessage)m;
+            if (healthy && !sosMessage.getHealthy()){
+                SupportMessage supportMessage = new SupportMessage(healthy, Tweets);
+                unicast(sosMessage.getSender(), supportMessage);
+            }
+        }
+
+        // receive support message from a healthy peer
+        else if (m instanceof SupportMessage){
+            SupportMessage supportMessage = (SupportMessage)m;
+            if (!healthy && supportMessage.getHealthy()){
+                Tweets = new TreeMap<Integer, String>(supportMessage.getTweets());
+                healthy = true;
+            }
+        }
+
         // Acceptors process Phase1b
-        if(m instanceof PrepareRequestMessage)
+        else if(m instanceof PrepareRequestMessage)
         {
             PrepareRequestMessage prepareRequest = (PrepareRequestMessage)m;
             int position = prepareRequest.getPosition();
@@ -295,7 +317,7 @@ public class Node {
 
             writeDebug("Got Accept Request from " + acceptRequest.getSender() + ": " + requestedProposal.toString());
 
-            // if promised to higher a ballot number, ignore this proposal
+            // if promised to higher ballot number, ignore this proposal
             if(ballotNumber < receivedMaxBallotNumber.get(position))
                 return;
 
@@ -317,7 +339,7 @@ public class Node {
             Proposal acceptedProposal = acceptConfirmMessage.getProposal();
             int position = acceptedProposal.getPosition();
 
-            // if first time a acceptance acquired
+            // if first time an acceptance acquired
             if (numAcceptances.get(position) == null){
                 numAcceptances.put(position,0);
             }
@@ -335,12 +357,11 @@ public class Node {
 
             // if recently learned from a quorum
             if(n > (cluster.size() / 2)) {
-                chosenValues.put(position, acceptedProposal.getValue());
                 writeDebug("Learned: " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
                 if(nodeInformation.getNum()==acceptedProposal.getProposerNumber() && !Tweets.containsKey(position)){
-                    Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
                     server.sendToClient("value accepted by " + n);
                 }
+                Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
             }
             else
                 numAcceptances.put(position, n);
@@ -418,6 +439,7 @@ public class Node {
 
     /* Handler handles when a proposal reaches timeout*/
     private class ProposalHandler extends Thread {
+
         private boolean alive;
         private long expireTime;
         private Proposal proposal;
@@ -431,14 +453,16 @@ public class Node {
             expireTime = System.currentTimeMillis() + proposeTimeout;
             while(alive) {
                 if(expireTime < System.currentTimeMillis()) {
-                    server.sendToClient("Timeout, not accepted!");
-                    kill();
+                    if (!Tweets.containsKey(proposal.getPosition())){
+                        server.sendToClient("Timeout, not accepted!");
+                    }
+                    suicide();
                 }
                 yield(); // so the while loop doesn't spin too much
             }
         }
 
-        public void kill() {
+        public void suicide() {
             alive = false;
         }
     }

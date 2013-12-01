@@ -77,10 +77,16 @@ public class Server extends Thread{
             String function = message.getFunction();
             if (function.equals("post")) {
                 node.propose(message.getArgument());
-                log("post received, voting...");
+                if (node.getStatus())
+                    log("post received, voting...");
+                else
+                    sendToClient("Server Node in failure");
             }
             else if (function.equals("read")){
-                sendToClient(node.getTweets());
+                if (node.getStatus())
+                    sendToClient(node.getTweets());
+                else
+                    sendToClient("Server Node in failure");
             }
             else if (function.equals("fail")){
                 node.fail();

@@ -49,12 +49,15 @@ public class Client {
         }
     }
 
-    public void run(){
+    private void run(){
+        String command;
         Scanner scanner = new Scanner(System.in);
-        String command = scanner.nextLine();
         Pattern pattern = Pattern.compile("[a-z]+\\s*(\".*\")*\\s*");
 
-        while (!command.equals("exit")){
+        while (true){
+
+            log("\nPlease command or exit:");
+            command = scanner.nextLine();
 
             // parse the command
             Matcher m = pattern.matcher(command);
@@ -63,28 +66,34 @@ public class Client {
             try {
                 if (m.find()) {
                     String[] commArray = command.split("\\s+");
-                    if (commArray[0].equals("post"))           {
+
+                    if (commArray[0].equals("exit"))
+                        break;
+                    else if (commArray[0].equals("post"))           {
                         String[] commArray2 = command.split("\"");
                         String tweet = commArray2[1];
-                        out.writeObject(new ClientMessage("post", tweet));
-                        log("post message sent");
+                        sendToServer("post", tweet);
+                        log("post sent");
                     }
                     else if (commArray[0].equals("read"))
-                        out.writeObject(new ClientMessage("read", ""));
+                        sendToServer("read", "");
                     else if (commArray[0].equals("fail"))
-                        out.writeObject(new ClientMessage("fail", ""));
+                        sendToServer("fail", "");
                     else if (commArray[0].equals("unfail"))
-                        out.writeObject(new ClientMessage("unfail", ""));
-                    else log("Invalid function or parameters!");
-                    out.flush();
+                        sendToServer("unfail", "");
+                    else{
+                        log("Invalid function or parameters!");
+                        continue;
+                    }
                 }
-                else log("Command pattern not found!");
+                else {
+                    log("Command pattern not found!");
+                    continue;
+                }
             } catch (ArrayIndexOutOfBoundsException ex){
                 log("Exception when reading commands!");
-            } catch (IOException ex){
-                log(" Exception when writing command objects");
+                continue;
             }
-
 
             // checkout server message
             try {
@@ -94,22 +103,28 @@ public class Client {
             } catch (ClassNotFoundException e) {
                 log("ClassNotFoundException while trying to read server message Object! ");
             }
-
-            log("\nPlease command or exit:");
-            command = scanner.nextLine();
         }
     }
 
-    public void log(String m){
+    private void log(String m){
         System.out.println(m);
     }
 
-    public void checkout(ServerMessage message){
+    private void sendToServer(String func, String para){
+        try{
+            out.writeObject(new ClientMessage(func, para));
+            out.flush();
+        } catch (IOException e) {
+            log("Exception while sending message to server!");
+        }
+    }
+
+    private void checkout(ServerMessage message){
         if (message != null) log(message.getMessage());
         else log("Unknown message received!");
     }
 
-    public void instruct() throws IOException{
+    private void instruct() throws IOException{
         log("This is a distributed micro blog client.");
         log("\n" +
                 "Command: function [para]");
@@ -118,8 +133,6 @@ public class Client {
         log("      2: read");
         log("      3: fail");
         log("      4: unfail");
-        log("\nPlease command or exit");
-
     }
 
     public static void main(String[] args) throws IOException {
@@ -127,5 +140,4 @@ public class Client {
         client.instruct();
         client.run();
     }
-
 }
