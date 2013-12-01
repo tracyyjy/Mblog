@@ -1,5 +1,7 @@
 package cs271.Messages;
 
+import cs271.Proposal;
+
 /**
  * Created with IntelliJ IDEA.
  * User: Photeinis

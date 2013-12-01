@@ -85,6 +85,7 @@ public class Client {
                 log(" Exception when writing command objects");
             }
 
+
             // checkout server message
             try {
                 checkout((ServerMessage) in.readObject());

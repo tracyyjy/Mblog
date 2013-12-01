@@ -41,6 +41,7 @@ public class Node {
     // K-V for positions and their current
     private Map<Integer, Integer> numPromises;
     private Map<Integer, Proposal> proposals;
+    private Map<Integer, ProposalHandler> handlers;
 
     /* Acceptor Variables */
     // K-V for positions and their maximum ballot number this acceptor ever received
@@ -48,7 +49,7 @@ public class Node {
     // K-V for positions and their proposals this acceptor ever accepted
     private Map<Integer, Proposal> acceptedProposals;
 
-    // Learner Variables
+    /* Learner Variables */
     private Map<Integer, Integer> numAcceptances;
     private Map<Integer, String> chosenValues;
 
@@ -65,6 +66,7 @@ public class Node {
         this.numPromises = new HashMap<Integer, Integer>();
         this.numAcceptances = new HashMap<Integer, Integer>();
         this.proposals = new HashMap<Integer, Proposal>();
+        this.handlers = new HashMap<Integer, ProposalHandler>();
         this.receivedMaxBallotNumber = new HashMap<Integer, Integer>();
         this.acceptedProposals = new HashMap<Integer, Proposal>();
         this.chosenValues = new HashMap<Integer, String>();
@@ -127,15 +129,22 @@ public class Node {
         else ballotNumber = currentProposedBallotNumbers.get(position) + 1;
         currentProposedBallotNumbers.put(currentProposedPosition, ballotNumber);
 
-        Proposal proposal = new Proposal(position, ballotNumber, value);
+        // remove possible legacy handler
+        if(handlers.containsKey(position))
+            handlers.remove(position).kill();
+        // create new proposal and its handler
+        Proposal proposal = new Proposal(nodeInformation.getNum(), position, ballotNumber, value);
         proposals.put(position, proposal);
+        ProposalHandler handler = new ProposalHandler(proposal);
+        handler.start();
+        handlers.put(position, handler);
 
         // send Phase1 prepare request to all with position & ballot number
         broadcast(new PrepareRequestMessage(position, ballotNumber));
     }
 
     private void knowCluster() {
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 3; i++) {
             this.cluster.add(new NodeInformation("localhost", 9905 + i, i));
         }
         log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNum() + " at " + nodeInformation.getHost() + ": " +nodeInformation.getPort());
@@ -312,13 +321,15 @@ public class Node {
             if (numAcceptances.get(position) == null){
                 numAcceptances.put(position,0);
             }
-            int n = numAcceptances.get(position);
 
             writeDebug("Got Accept Notification from " + acceptConfirmMessage.getSender() + ": " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
 
             // ignore if already learned from a majority
-            if (n > (cluster.size() / 2))
+            if (numAcceptances.get(position) > (cluster.size() / 2)){
                 return;
+            }
+
+            int n = numAcceptances.get(position);
 
             n++;
 
@@ -326,8 +337,10 @@ public class Node {
             if(n > (cluster.size() / 2)) {
                 chosenValues.put(position, acceptedProposal.getValue());
                 writeDebug("Learned: " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
-                Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
-                server.sendToClient("value accepted");
+                if(nodeInformation.getNum()==acceptedProposal.getProposerNumber() && !Tweets.containsKey(position)){
+                    Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
+                    server.sendToClient("value accepted by " + n);
+                }
             }
             else
                 numAcceptances.put(position, n);
@@ -403,21 +416,22 @@ public class Node {
         }
     }
 
-    private class Proposer extends Thread {
-        private boolean isRunning;
+    /* Handler handles when a proposal reaches timeout*/
+    private class ProposalHandler extends Thread {
+        private boolean alive;
         private long expireTime;
         private Proposal proposal;
 
-        public Proposer(Proposal proposal) {
-            this.isRunning = true;
+        public ProposalHandler(Proposal proposal) {
+            this.alive = true;
             this.proposal = proposal;
         }
 
         public void run() {
             expireTime = System.currentTimeMillis() + proposeTimeout;
-            while(isRunning) {
+            while(alive) {
                 if(expireTime < System.currentTimeMillis()) {
-                    propose(proposal.getValue(), proposal.getPosition());
+                    server.sendToClient("Timeout, not accepted!");
                     kill();
                 }
                 yield(); // so the while loop doesn't spin too much
@@ -425,7 +439,7 @@ public class Node {
         }
 
         public void kill() {
-            isRunning = false;
+            alive = false;
         }
     }
 }

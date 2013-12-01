@@ -1,4 +1,4 @@
-package cs271.Messages;
+package cs271;
 
 import java.io.Serializable;
 
@@ -12,15 +12,21 @@ import java.io.Serializable;
 
 public class Proposal implements Serializable
 {
+    private int proposerNumber;
     private int position;
     private int BallotNumber;
     private String value;
 
-    public Proposal(int position, int BallotNumber, String value)
+    public Proposal(int proposerNumber, int position, int BallotNumber, String value)
     {
+        this.proposerNumber = proposerNumber;
         this.position = position;
         this.BallotNumber = BallotNumber;
         this.value = value;
+    }
+
+    public int getProposerNumber(){
+        return proposerNumber;
     }
 
     public int getPosition()

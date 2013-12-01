@@ -25,6 +25,4 @@ public class ClientMessage implements Serializable {
     public String getArgument(){
         return argument;
     }
-
-
 }
