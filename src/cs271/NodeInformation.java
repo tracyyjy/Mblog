@@ -15,29 +15,12 @@ public class NodeInformation implements Serializable
     private String host;
     private int port;
     private int num;
-    private boolean isLeader;
 
     public NodeInformation(String host, int port, int num)
     {
         this.host = host;
         this.port = port;
         this.num = num;
-        this.isLeader = false;
-    }
-
-    public void becomeLeader()
-    {
-        isLeader = true;
-    }
-
-    public void becomeNonLeader()
-    {
-        isLeader = false;
-    }
-
-    public boolean isLeader()
-    {
-        return isLeader;
     }
 
     public String getHost()

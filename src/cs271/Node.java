@@ -17,6 +17,10 @@ import java.util.*;
 
 public class Node {
 
+    // constants for paxos modes
+    private static final boolean multi = true;
+    private static final boolean basic = false;
+
     // timeout per connection
     private static final int socketTimeout = 1000;
 
@@ -25,6 +29,7 @@ public class Node {
 
     // Node Data
     private TreeMap<Integer, String> Tweets;
+    private ArrayList<String> GlobalTweets;
 
     private Server server;
     private ServerSocket clientListener;
@@ -32,6 +37,7 @@ public class Node {
 
     private Set<NodeInformation> cluster;
     private NodeInformation nodeInformation;
+    private boolean mode;
     private boolean alive;
     private boolean healthy;
 
@@ -39,7 +45,7 @@ public class Node {
     private int currentProposedPosition;
     // K-V for positions and their current proposed ballot number in this node
     private Map<Integer, Integer> currentProposedBallotNumbers;
-    // K-V for positions and their current
+    // K-V for positions and their current statistics
     private Map<Integer, Integer> numPromises;
     private Map<Integer, Proposal> proposals;
     private Map<Integer, ProposalHandler> handlers;
@@ -52,10 +58,16 @@ public class Node {
 
     /* Learner Variables */
     private Map<Integer, Integer> numAcceptances;
+    private ArrayList<Map<Integer, Integer>> numIsolatedAcceptances;
 
-    public Node(int port, int siteNum) throws IOException{
+    public Node(int port, int siteNum, boolean mode) throws IOException{
 
         // initialize local and cluster information
+        this.mode = mode;
+        if (mode==multi){
+            this.GlobalTweets = new ArrayList<String>();
+            this.numIsolatedAcceptances = new ArrayList<Map<Integer, Integer>>();
+        }
         this.Tweets = new TreeMap<Integer, String>();
         this.nodeInformation = new NodeInformation("localhost", port, siteNum);
         this.cluster = new HashSet<NodeInformation>();
@@ -84,7 +96,7 @@ public class Node {
         alive = true;
         healthy = true;
 
-        log("Node " + nodeInformation.getNum() + " started");
+        log("Node " + nodeInformation.getNum() + " started, multi-paxos: " + mode);
     }
 
     public synchronized boolean getStatus(){
@@ -128,8 +140,10 @@ public class Node {
 
         // increment the ballot number for a position
         int ballotNumber;
-        if (!currentProposedBallotNumbers.containsKey(position)) ballotNumber = 0;
-        else ballotNumber = currentProposedBallotNumbers.get(position) + 1;
+        if (!currentProposedBallotNumbers.containsKey(position))
+            ballotNumber = 0;
+        else
+            ballotNumber = currentProposedBallotNumbers.get(position) + 1;
         currentProposedBallotNumbers.put(currentProposedPosition, ballotNumber);
 
         // remove possible legacy handler
@@ -143,8 +157,12 @@ public class Node {
         handler.start();
         handlers.put(position, handler);
 
-        // send Phase1 prepare request to all with position & ballot number
-        broadcast(new PrepareRequestMessage(position, ballotNumber));
+        // in Basic Paxos, send Phase1 prepare request to all with position & ballot number
+        if (mode==basic)
+            broadcast(new PrepareRequestMessage(position, ballotNumber));
+        // in Multi-Paxos, send Phase2 accept request to all with position and proposal
+        else
+            broadcast(new AcceptRequestMessage(position, proposal));
     }
 
     private void knowCluster() {
@@ -310,6 +328,7 @@ public class Node {
 
         // Acceptors process Phase2b
         else if(m instanceof AcceptRequestMessage) {
+
             AcceptRequestMessage acceptRequest = (AcceptRequestMessage)m;
             Proposal requestedProposal = acceptRequest.getProposal();
             int position = requestedProposal.getPosition();
@@ -317,14 +336,21 @@ public class Node {
 
             writeDebug("Got Accept Request from " + acceptRequest.getSender() + ": " + requestedProposal.toString());
 
-            // if promised to higher ballot number, ignore this proposal
-            if(ballotNumber < receivedMaxBallotNumber.get(position))
-                return;
+            if (mode == basic){
+                // if promised to higher ballot number, ignore this proposal
+                if(ballotNumber < receivedMaxBallotNumber.get(position))
+                    return;
 
-            // otherwise "accept" the proposal, here one acceptor might update its max ballot number with some number raised other acceptors
-            if(ballotNumber > receivedMaxBallotNumber.get(position))
-                receivedMaxBallotNumber.put(position, ballotNumber);
-            acceptedProposals.put(position, requestedProposal);
+                // otherwise "accept" the proposal, here one acceptor might update its max ballot number with some number raised other acceptors
+                if(ballotNumber > receivedMaxBallotNumber.get(position))
+                    receivedMaxBallotNumber.put(position, ballotNumber);
+                acceptedProposals.put(position, requestedProposal);
+            }
+            else {
+                // verification for leadership
+                if (requestedProposal.getProposerNumber()!=m.getSender().getNum())
+                    return;
+            };
 
             writeDebug("Accepted: " + requestedProposal.toString());
 
@@ -338,33 +364,48 @@ public class Node {
             AcceptConfirmMessage acceptConfirmMessage = (AcceptConfirmMessage)m;
             Proposal acceptedProposal = acceptConfirmMessage.getProposal();
             int position = acceptedProposal.getPosition();
+            int proposerId = acceptedProposal.getProposerNumber();
+            Map<Integer, Integer> acceptanceList;
 
-            // if first time an acceptance acquired
-            if (numAcceptances.get(position) == null){
-                numAcceptances.put(position,0);
+            if (mode==basic){
+                acceptanceList = numAcceptances;
+            }
+            else {
+                acceptanceList = (HashMap<Integer, Integer>) numIsolatedAcceptances.get(proposerId);
             }
 
-            writeDebug("Got Accept Notification from " + acceptConfirmMessage.getSender() + ": " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
+            // if first time an acceptance acquired
+            if (acceptanceList.get(position) == null){
+                acceptanceList.put(position, 0);
+            }
+
+            writeDebug("Got Accept Confirm from " + acceptConfirmMessage.getSender() + ": " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
 
             // ignore if already learned from a majority
-            if (numAcceptances.get(position) > (cluster.size() / 2)){
+            if (acceptanceList.get(position) > (cluster.size() / 2)){
                 return;
             }
 
-            int n = numAcceptances.get(position);
+            int n = acceptanceList.get(position);
 
             n++;
 
             // if recently learned from a quorum
             if(n > (cluster.size() / 2)) {
                 writeDebug("Learned: " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
-                if(nodeInformation.getNum()==acceptedProposal.getProposerNumber() && !Tweets.containsKey(position)){
+                if(nodeInformation.getNum()==acceptedProposal.getProposerNumber()){
                     server.sendToClient("value accepted by " + n);
+                    Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
                 }
-                Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
+                else{
+                    GlobalTweets.add(proposerId + ": " +acceptedProposal.getValue());
+                    if (mode == basic)
+                        Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
+                }
             }
             else
-                numAcceptances.put(position, n);
+                acceptanceList.put(position, n);
+
         }
         else
             writeDebug("Unknown Message received", true);
@@ -387,9 +428,13 @@ public class Node {
     }
 
     public static void main(String[] args) throws IOException {
+        boolean mode = basic;
         int port = Integer.parseInt(args[0]);
         int siteNum = Integer.parseInt(args[1]);
-        Node node = new Node(port, siteNum);
+        if (args.length > 2){
+            if (args[2].equals("multi")) mode = multi;
+        }
+        Node node = new Node(port, siteNum, mode);
     }
 
     /* Agent class assumes the role of Proposer/Acceptor*/
