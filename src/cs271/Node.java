@@ -424,6 +424,10 @@ public class Node {
 
             if (mode == basic){
                 // if promised to higher ballot number, ignore this proposal
+
+                if(!receivedMaxBallotNumber.containsKey(position)){
+                    receivedMaxBallotNumber.put(position , ballotNumber);
+                }
                 if(ballotNumber < receivedMaxBallotNumber.get(position))
                     return;
 
