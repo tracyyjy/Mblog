@@ -372,12 +372,13 @@ public class Node {
 
             // if acceptor already promised something equal or higher, use higher ballot number
             if(!promised) {
-                int tmpBallotNumber = currentProposedBallotNumbers.get(position);
+                /*int tmpBallotNumber = currentProposedBallotNumbers.get(position);
                 while(tmpBallotNumber < ballotNumber)
                     tmpBallotNumber += cluster.size();
-                currentProposedBallotNumbers.put(position, tmpBallotNumber);
-                propose(proposal.getValue(), proposal.getPosition());
-                log( "REPROPOSED!");
+                currentProposedBallotNumbers.put(position, tmpBallotNumber);*/
+                log( "ought to be REPROPOSED!");
+                /*propose(proposal.getValue(), proposal.getPosition());
+                log( "REPROPOSED!");*/
 
                 return;
             }
@@ -393,6 +394,8 @@ public class Node {
                 if (acceptedProposal.getBallotNumber() > maxAcceptedProposalBallotNumber.get(position)){
                     proposal.setValue(acceptedProposal.getValue());
                     maxAcceptedProposalBallotNumber.put(position, proposal.getBallotNumber());
+                    writeDebug("maxAcceptedProposalBallotNumber: "+maxAcceptedProposalBallotNumber.get(position));
+                    writeDebug("proposals.get(position) Balnum: "+ proposals.get(position).getBallotNumber()+"Value"+proposals.get(position).getValue());
                 }
             }
 
@@ -415,7 +418,7 @@ public class Node {
             Proposal requestedProposal = acceptRequest.getProposal();
             int position = requestedProposal.getPosition();
             int ballotNumber = requestedProposal.getBallotNumber();
-
+            writeDebug("Got Accept Request from Proposer: position: "+position+"bal num"+ballotNumber;
             writeDebug("Got Accept Request from Proposer: " + acceptRequest.getSender().getNodeId() + ", proposal: " + requestedProposal.toString());
 
             if (mode == basic){
