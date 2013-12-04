@@ -44,6 +44,10 @@ public class Proposal implements Serializable
         return value;
     }
 
+    public void setValue(String value){
+        this.value =value;
+    }
+
     public String toString()
     {
         return "{" + position + ", " + BallotNumber + ", " + value + "}";

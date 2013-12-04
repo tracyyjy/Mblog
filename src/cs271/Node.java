@@ -376,6 +376,8 @@ public class Node {
                     tmpBallotNumber += cluster.size();
                 currentProposedBallotNumbers.put(position, tmpBallotNumber);
                 propose(proposal.getValue(), proposal.getPosition());
+                log( "REPROPOSED!");
+
                 return;
             }
 
@@ -388,7 +390,7 @@ public class Node {
                     maxAcceptedProposalBallotNumber.put(position,-1);
                 }
                 if (acceptedProposal.getBallotNumber() > maxAcceptedProposalBallotNumber.get(position)){
-                    proposal = acceptedProposal;
+                    proposal.setValue(acceptedProposal.getValue());
                     maxAcceptedProposalBallotNumber.put(position, proposal.getBallotNumber());
                 }
             }
