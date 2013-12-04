@@ -21,6 +21,16 @@ public class Node {
     private static final boolean multi = true;
     private static final boolean basic = false;
 
+    // EC2 network set-up
+    private static final Map<String, Integer> Hosts= new HashMap<String, Integer>();
+    static{
+        Hosts.put("23.20.72.231", 0);
+        Hosts.put("50.112.9.1", 1);
+        Hosts.put("54.215.35.190", 2);
+        Hosts.put("54.247.12.88", 3);
+        Hosts.put("54.254.32.56", 4);
+    }
+
     // timeout per connection
     private static final int socketTimeout = 1000;
 
@@ -61,13 +71,13 @@ public class Node {
     private Map<Integer, Integer> numAcceptances;
     private ArrayList<Map<Integer, Integer>> numIsolatedAcceptances;
 
-    public Node(int port, int siteNum, boolean mode) throws IOException{
+    public Node(String host, boolean mode) throws IOException{
 
         // initialize local and cluster information
         this.mode = mode;
 
         this.Tweets = new TreeMap<Integer, String>();
-        this.nodeInformation = new NodeInformation("localhost", port, siteNum);
+        this.nodeInformation = new NodeInformation(host, 9905, Hosts.get(host));
         this.cluster = new HashSet<NodeInformation>();
         this.knowCluster();
 
@@ -93,7 +103,7 @@ public class Node {
         this.alive = false;
 
         // register C/S server socket
-        clientListener = new ServerSocket(9900 + nodeInformation.getNodeId());
+        clientListener = new ServerSocket(9900 /*+ nodeInformation.getNodeId()*/);
         server = new Server(this, clientListener);
         server.start();
 
@@ -205,10 +215,10 @@ public class Node {
     }
 
     private void knowCluster() {
-        for (int i = 0; i < 3; i++) {
-            this.cluster.add(new NodeInformation("localhost", 9905 + i, i));
+        for (Map.Entry entry: Hosts.entrySet()) {
+            this.cluster.add(new NodeInformation((String) entry.getKey(), 9905, (Integer) entry.getValue()));
         }
-        log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNodeId() + " at " + nodeInformation.getHost() + ": " +nodeInformation.getPort());
+        log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNodeId() + " at " + nodeInformation.getHost() + ": " + nodeInformation.getPort());
     }
 
     private void broadcast(Message m) {
@@ -446,7 +456,7 @@ public class Node {
             log("after " + Integer.toString(n));
 
             // if recently learned from a quorum
-            if(n > (1/*cluster.size() / 2*/)) {
+            if(n > (cluster.size() / 2)) {
                 writeDebug("Learned: " + n + " " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
                 if(nodeInformation.getNodeId()==acceptedProposal.getProposerNumber()){
                     server.sendToClient("value accepted by " + n);
@@ -490,12 +500,11 @@ public class Node {
 
     public static void main(String[] args) throws IOException {
         boolean mode = basic;
-        int port = Integer.parseInt(args[0]);
-        int siteNum = Integer.parseInt(args[1]);
-        if (args.length > 2){
-            if (args[2].equals("multi")) mode = multi;
+        String host = args[0];
+        if (args.length > 1){
+            if (args[1].equals("multi")) mode = multi;
         }
-        Node node = new Node(port, siteNum, mode);
+        Node node = new Node(host, mode);
     }
 
     /* Agent class assumes the role of Proposer/Acceptor*/
