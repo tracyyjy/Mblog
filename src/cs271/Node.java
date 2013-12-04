@@ -23,6 +23,7 @@ public class Node {
 
     // EC2 network set-up
     private static final Map<String, Integer> Hosts= new HashMap<String, Integer>();
+
     static{
 //        Hosts.put("23.20.72.231", 0);
 //        Hosts.put("50.112.9.1", 1);
@@ -63,6 +64,7 @@ public class Node {
     private Map<Integer, Integer> numPromises;
     private Map<Integer, Proposal> proposals;
     private Map<Integer, ProposalHandler> handlers;
+    private Map<Integer, Integer> maxAcceptedProposalBallotNumber;
 
     /* Acceptor Variables */
     // K-V for positions and their maximum ballot number this acceptor ever received
@@ -96,6 +98,7 @@ public class Node {
 
         this.currentProposedPosition = 0;
         this.currentProposedBallotNumbers = new HashMap<Integer, Integer>();
+        this.maxAcceptedProposalBallotNumber = new HashMap<Integer, Integer>();
         this.numPromises = new HashMap<Integer, Integer>();
         this.numAcceptances = new HashMap<Integer, Integer>();
         this.proposals = new HashMap<Integer, Proposal>();
@@ -357,13 +360,13 @@ public class Node {
             boolean accepted = prepareResponse.getAccepted();
             int n = numPromises.get(position);
 
-            writeDebug("Got Prepare Response from " + prepareResponse.getSender() + ": " + position + ", " + ballotNumber + ", " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
+            writeDebug("Got Prepare Response from Acceptor: " + prepareResponse.getSender().getNodeId() + ", position: " + position + ", required ballot number: " + ballotNumber + ", accepted value: " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
 
-            // ignore if already heard from a majority
+            // ignore if already heard from a quorum
             if (n > (cluster.size() / 2))
                 return;
 
-            // if acceptor already promised something higher, use higher ballot number
+            // if acceptor already promised something equal or higher, use higher ballot number
             if(!promised) {
                 int tmpBallotNumber = currentProposedBallotNumbers.get(position);
                 while(tmpBallotNumber < ballotNumber)
@@ -378,8 +381,13 @@ public class Node {
 
             // if acceptors already accepted something (maybe different), always keep the one with highest ballot number
             if(accepted && acceptedProposal!=null) {
-                if (acceptedProposal.getBallotNumber() > proposal.getBallotNumber())
+                if (!maxAcceptedProposalBallotNumber.containsKey(position)){
+                    maxAcceptedProposalBallotNumber.put(position,-1);
+                }
+                if (acceptedProposal.getBallotNumber() > maxAcceptedProposalBallotNumber.get(position)){
                     proposal = acceptedProposal;
+                    maxAcceptedProposalBallotNumber.put(position, proposal.getBallotNumber());
+                }
             }
 
             // if recently promised by a quorum
@@ -400,17 +408,17 @@ public class Node {
             int position = requestedProposal.getPosition();
             int ballotNumber = requestedProposal.getBallotNumber();
 
-            writeDebug("Got Accept Request from " + acceptRequest.getSender() + ": " + requestedProposal.toString());
+            writeDebug("Got Accept Request from Proposer: " + acceptRequest.getSender().getNodeId() + ", proposal: " + requestedProposal.toString());
 
             if (mode == basic){
                 // if promised to higher ballot number, ignore this proposal
                 if(ballotNumber < receivedMaxBallotNumber.get(position))
                     return;
 
-                // otherwise "accept" the proposal, here one acceptor might update its max ballot number with some number raised other acceptors
-                if(ballotNumber > receivedMaxBallotNumber.get(position))
-                    receivedMaxBallotNumber.put(position, ballotNumber);
+                // otherwise "accept" the proposal, here one acceptor might update its max ballot number with some number raised by other acceptors
+                //                    receivedMaxBallotNumber.put(position, ballotNumber);
                 acceptedProposals.put(position, requestedProposal);
+                Tweets.put(requestedProposal.getPosition(), requestedProposal.getValue());
             }
             else {
                 // verification for leadership
@@ -418,14 +426,15 @@ public class Node {
                     return;
             };
 
-            writeDebug("Accepted: " + requestedProposal.toString());
+            writeDebug("Accepted proposal:" + requestedProposal.toString());
 
             // Broadcast decision to all
             AcceptConfirmMessage acceptConfirmMessage = new AcceptConfirmMessage(position, requestedProposal);
-            broadcast(acceptConfirmMessage);
+            //broadcast(acceptConfirmMessage);
+            unicast(m.getSender(),acceptConfirmMessage);
         }
 
-        // Proposers & Learners learn the decision
+        // Proposers learn the decision
         else if(m instanceof AcceptConfirmMessage) {
             AcceptConfirmMessage acceptConfirmMessage = (AcceptConfirmMessage)m;
             Proposal acceptedProposal = acceptConfirmMessage.getProposal();
@@ -479,7 +488,6 @@ public class Node {
             log("finally " + Integer.toString(n));
             log("finally " + acceptanceList.get(position));
             log("finally " + numAcceptances.get(position));
-
         }
         else
             writeDebug("Unknown Message received", true);
