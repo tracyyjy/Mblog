@@ -94,7 +94,18 @@ public class Server extends Thread{
             }
             else if (function.equals("unfail")){
                 node.recover();
-                sendToClient("node recovered");
+                try {
+                    sleep(5000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                }
+                if (node.getStatus()){
+                    sendToClient("node recovered");
+                }
+                else {
+
+                    sendToClient("Server not fully recovered, try unfail again!");
+                }
             }
         else
             log("Unknown client message received!");

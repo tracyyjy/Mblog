@@ -14,13 +14,13 @@ public class NodeInformation implements Serializable
 {
     private String host;
     private int port;
-    private int num;
+    private int nodeId;
 
-    public NodeInformation(String host, int port, int num)
+    public NodeInformation(String host, int port, int nodeId)
     {
         this.host = host;
         this.port = port;
-        this.num = num;
+        this.nodeId = nodeId;
     }
 
     public String getHost()
@@ -33,13 +33,13 @@ public class NodeInformation implements Serializable
         return port;
     }
 
-    public int getNum()
+    public int getNodeId()
     {
-        return num;
+        return nodeId;
     }
 
     public String toString()
     {
-        return ((Integer)num).toString();
+        return ((Integer) nodeId).toString();
     }
 }

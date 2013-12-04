@@ -40,6 +40,7 @@ public class Node {
     private boolean mode;
     private boolean alive;
     private boolean healthy;
+    private int health;
 
     /* Proposer Variables */
     private int currentProposedPosition;
@@ -64,14 +65,21 @@ public class Node {
 
         // initialize local and cluster information
         this.mode = mode;
-        if (mode==multi){
-            this.GlobalTweets = new ArrayList<String>();
-            this.numIsolatedAcceptances = new ArrayList<Map<Integer, Integer>>();
-        }
+
         this.Tweets = new TreeMap<Integer, String>();
         this.nodeInformation = new NodeInformation("localhost", port, siteNum);
         this.cluster = new HashSet<NodeInformation>();
         this.knowCluster();
+
+        this.numIsolatedAcceptances = new ArrayList<Map<Integer, Integer>>();
+
+        if (mode==multi){
+            this.GlobalTweets = new ArrayList<String>();
+            for (int i = 0; i < cluster.size(); i++){
+                Map<Integer, Integer> tempMap = new HashMap<Integer, Integer>();
+                numIsolatedAcceptances.add(tempMap);
+            }
+        }
 
         this.currentProposedPosition = 0;
         this.currentProposedBallotNumbers = new HashMap<Integer, Integer>();
@@ -85,27 +93,35 @@ public class Node {
         this.alive = false;
 
         // register C/S server socket
-        clientListener = new ServerSocket(9900 + nodeInformation.getNum());
+        clientListener = new ServerSocket(9900 + nodeInformation.getNodeId());
         server = new Server(this, clientListener);
         server.start();
 
         // register inter-node communication socket
         peerListener = new Agent();
-        peerListener.start();
+        Thread test = new Thread(peerListener);
+        test.start();
 
         alive = true;
+        if (mode==multi){
+            this.health = cluster.size();
+        }
         healthy = true;
 
-        log("Node " + nodeInformation.getNum() + " started, multi-paxos: " + mode);
+
+        log("Node " + nodeInformation.getNodeId() + " started, multi-paxos: " + mode);
     }
 
     public synchronized boolean getStatus(){
-        return alive;
+        return healthy;
     }
 
     public synchronized void fail() {
         /* failure simulation */
         healthy = false;
+        if (mode==multi){
+            this.health = 0;
+        }
         alive = false;
         log("**********FAILING**********");
     }
@@ -113,7 +129,17 @@ public class Node {
     public synchronized void recover() {
         /* recovery simulation */
         alive = true;
-        broadcast(new SosMessage());
+        if (!healthy){
+            if (mode == multi){
+                health = 0;
+                GlobalTweets.clear();
+                for (Map.Entry entry: Tweets.entrySet()){
+                    GlobalTweets.add("From node " + nodeInformation.getNodeId() + " with " + (String) entry.getValue());
+                }
+                health++;
+            }
+            broadcast(new SosMessage());
+        }
     }
 
     public String getTweets(){
@@ -121,6 +147,19 @@ public class Node {
         string = new String();
         for (Map.Entry entry: Tweets.entrySet()){
             String tmp = entry.getKey() + ": " + entry.getValue() + "\n";
+            string += tmp;
+        }
+        if (mode == multi){
+            string += "Global Stream:\n" + getGlobalTweets();
+            string = "Local Stream:\n" + string;
+        }
+        return string;
+    }
+
+    public String getGlobalTweets(){
+        String string = new String();
+        for (String tweet: GlobalTweets){
+            String tmp = tweet + "\n";
             string += tmp;
         }
         return string;
@@ -151,7 +190,7 @@ public class Node {
             handlers.remove(position).suicide();
         }
         // create new proposal and its handler
-        Proposal proposal = new Proposal(nodeInformation.getNum(), position, ballotNumber, value);
+        Proposal proposal = new Proposal(nodeInformation.getNodeId(), position, ballotNumber, value);
         proposals.put(position, proposal);
         ProposalHandler handler = new ProposalHandler(proposal);
         handler.start();
@@ -169,7 +208,7 @@ public class Node {
         for (int i = 0; i < 3; i++) {
             this.cluster.add(new NodeInformation("localhost", 9905 + i, i));
         }
-        log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNum() + " at " + nodeInformation.getHost() + ": " +nodeInformation.getPort());
+        log(cluster.size()+ " nodes in cluster. Node " + nodeInformation.getNodeId() + " at " + nodeInformation.getHost() + ": " +nodeInformation.getPort());
     }
 
     private void broadcast(Message m) {
@@ -208,11 +247,11 @@ public class Node {
         }
         catch(ConnectException e)
         {
-            writeDebug("Exception when unicasting to node" + node.getNum() + " (refused)", true);
+            writeDebug("Exception when unicasting to node" + node.getNodeId() + " (refused)", true);
         }
         catch(SocketTimeoutException e)
         {
-            writeDebug("Exception when unicasting to node" + node.getNum() + " (timeout)", true);
+            writeDebug("Exception when unicasting to node" + node.getNodeId() + " (timeout)", true);
         }
         catch(IOException e)
         {
@@ -243,6 +282,7 @@ public class Node {
             SosMessage sosMessage = (SosMessage)m;
             if (healthy && !sosMessage.getHealthy()){
                 SupportMessage supportMessage = new SupportMessage(healthy, Tweets);
+                supportMessage.setSender(nodeInformation);
                 unicast(sosMessage.getSender(), supportMessage);
             }
         }
@@ -250,9 +290,22 @@ public class Node {
         // receive support message from a healthy peer
         else if (m instanceof SupportMessage){
             SupportMessage supportMessage = (SupportMessage)m;
-            if (!healthy && supportMessage.getHealthy()){
-                Tweets = new TreeMap<Integer, String>(supportMessage.getTweets());
-                healthy = true;
+            if (mode==basic){
+                if (!healthy && supportMessage.getHealthy()){
+                    Tweets = new TreeMap<Integer, String>(supportMessage.getTweets());
+                    healthy = true;
+                    log("**********Recovering********** Healthy: " + String.valueOf(healthy));
+                }
+            }
+            else {
+                if (!healthy && supportMessage.getHealthy()){
+                    for (Map.Entry entry: supportMessage.getTweets().entrySet()){
+                        GlobalTweets.add("From node " + supportMessage.getSender().getNodeId() + " with " + (String) entry.getValue());
+                    }
+                    health++;
+                    healthy = (health==cluster.size());
+                    log("**********Recovering********** Health: " + String.valueOf(health) + " Healthy: " + String.valueOf(healthy));
+                }
             }
         }
 
@@ -348,7 +401,7 @@ public class Node {
             }
             else {
                 // verification for leadership
-                if (requestedProposal.getProposerNumber()!=m.getSender().getNum())
+                if (requestedProposal.getProposerNumber()!=m.getSender().getNodeId())
                     return;
             };
 
@@ -371,7 +424,7 @@ public class Node {
                 acceptanceList = numAcceptances;
             }
             else {
-                acceptanceList = (HashMap<Integer, Integer>) numIsolatedAcceptances.get(proposerId);
+                acceptanceList = (HashMap<Integer, Integer>) (numIsolatedAcceptances.get(proposerId));
             }
 
             // if first time an acceptance acquired
@@ -381,30 +434,38 @@ public class Node {
 
             writeDebug("Got Accept Confirm from " + acceptConfirmMessage.getSender() + ": " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
 
-            // ignore if already learned from a majority
-            if (acceptanceList.get(position) > (cluster.size() / 2)){
+            int n = acceptanceList.get(position);
+
+            // ignore if already learned from a quorum
+            if (n > (cluster.size() / 2)){
                 return;
             }
 
-            int n = acceptanceList.get(position);
-
+            log("before " + Integer.toString(n));
             n++;
+            log("after " + Integer.toString(n));
 
             // if recently learned from a quorum
-            if(n > (cluster.size() / 2)) {
-                writeDebug("Learned: " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
-                if(nodeInformation.getNum()==acceptedProposal.getProposerNumber()){
+            if(n > (1/*cluster.size() / 2*/)) {
+                writeDebug("Learned: " + n + " " + acceptedProposal.getPosition() + ", " + acceptedProposal.getValue());
+                if(nodeInformation.getNodeId()==acceptedProposal.getProposerNumber()){
                     server.sendToClient("value accepted by " + n);
                     Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
                 }
                 else{
-                    GlobalTweets.add(proposerId + ": " +acceptedProposal.getValue());
-                    if (mode == basic)
+                    if(mode==basic){
                         Tweets.put(acceptedProposal.getPosition(), acceptedProposal.getValue());
+                    }
+                }
+                if (mode==multi){
+                    GlobalTweets.add("From node " + proposerId + " with " + acceptedProposal.getValue());
                 }
             }
-            else
-                acceptanceList.put(position, n);
+            acceptanceList.put(position, n);
+
+            log("finally " + Integer.toString(n));
+            log("finally " + acceptanceList.get(position));
+            log("finally " + numAcceptances.get(position));
 
         }
         else
@@ -438,7 +499,7 @@ public class Node {
     }
 
     /* Agent class assumes the role of Proposer/Acceptor*/
-    private class Agent extends Thread {
+    private class Agent implements Runnable {
         private boolean isRunning;
         private ServerSocket serverSocket;
 
