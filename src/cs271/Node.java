@@ -419,7 +419,7 @@ public class Node {
             Proposal requestedProposal = acceptRequest.getProposal();
             int position = requestedProposal.getPosition();
             int ballotNumber = requestedProposal.getBallotNumber();
-            writeDebug("Got Accept Request from Proposer: position: "+position+"bal num"+ballotNumber;
+            writeDebug("Got Accept Request from Proposer: position: "+position+"bal num"+ballotNumber);
             writeDebug("Got Accept Request from Proposer: " + acceptRequest.getSender().getNodeId() + ", proposal: " + requestedProposal.toString());
 
             if (mode == basic){
