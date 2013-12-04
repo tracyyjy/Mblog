@@ -217,6 +217,8 @@ public class Node {
         // in Multi-Paxos, send Phase2 accept request to all with position and proposal
         else
             broadcast(new AcceptRequestMessage(position, proposal));
+
+        writeDebug("Sent Prepare Request to Acceptors: " + ", position: " + position + ", ballot number: " + ballotNumber );
     }
 
     private void knowCluster() {
