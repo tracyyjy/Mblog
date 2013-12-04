@@ -24,11 +24,14 @@ public class Node {
     // EC2 network set-up
     private static final Map<String, Integer> Hosts= new HashMap<String, Integer>();
     static{
-        Hosts.put("23.20.72.231", 0);
-        Hosts.put("50.112.9.1", 1);
-        Hosts.put("54.215.35.190", 2);
-        Hosts.put("54.247.12.88", 3);
-        Hosts.put("54.254.32.56", 4);
+//        Hosts.put("23.20.72.231", 0);
+//        Hosts.put("50.112.9.1", 1);
+//        Hosts.put("54.215.35.190", 2);
+//        Hosts.put("54.247.12.88", 3);
+//        Hosts.put("54.254.32.56", 4);
+        Hosts.put("192.168.0.100", 0);
+        Hosts.put("192.168.0.103", 1);
+        Hosts.put("192.168.0.104", 2);
     }
 
     // timeout per connection
