@@ -333,7 +333,7 @@ public class Node {
             boolean promised = false;
             boolean accepted = acceptedProposals.containsKey(position);
 
-            writeDebug("Got Prepare Request from " + prepareRequest.getSender() + ": (" + position + ", "+ ballotNumber + ")");
+            writeDebug("Got Prepare Request from Proposer: " + prepareRequest.getSender().getNodeId() + ", position: " + position + ", ballot number: "+ ballotNumber + "");
 
             // if ballot number is higher than any received proposal for a given position, promise it
             if(!receivedMaxBallotNumber.containsKey(position) || receivedMaxBallotNumber.get(position) < ballotNumber){
@@ -344,7 +344,10 @@ public class Node {
             // if has accepted some proposal, respond with this proposal; otherwise respond with null
             PrepareResponseMessage prepareResponse = new PrepareResponseMessage(position, receivedMaxBallotNumber.get(position), promised, accepted, acceptedProposals.get(position));
             prepareResponse.setSender(nodeInformation);
+            prepareResponse.setReceiver(prepareRequest.getSender());
             unicast(prepareRequest.getSender(), prepareResponse);
+
+            writeDebug("Sent Prepare Response to Acceptor: " + prepareResponse.getReceiver().getNodeId() + ", promised?:" + promised + ", position: " + position + ", required ballot number: " + ballotNumber + ", accepted value: " + (acceptedProposals.get(position) == null ? "None" : acceptedProposals.get(position).toString()));
         }
 
         // Proposer processes Phase2a
@@ -359,7 +362,7 @@ public class Node {
             boolean accepted = prepareResponse.getAccepted();
             int n = numPromises.get(position);
 
-            writeDebug("Got Prepare Response from Acceptor: " + prepareResponse.getSender().getNodeId() + ", position: " + position + ", required ballot number: " + ballotNumber + ", accepted value: " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
+            writeDebug("Got Prepare Response from Acceptor: " + prepareResponse.getSender().getNodeId() + ", promised?:" + promised + ", position: " + position + ", required ballot number: " + ballotNumber + ", accepted value: " + (acceptedProposal == null ? "None" : acceptedProposal.toString()));
 
             // ignore if already heard from a quorum
             if (n > (cluster.size() / 2))
@@ -392,7 +395,9 @@ public class Node {
             // if recently promised by a quorum
             if(n > (cluster.size() / 2)) {
                 AcceptRequestMessage acceptRequest = new AcceptRequestMessage(position, proposal);
+                acceptRequest.setSender(nodeInformation);
                 broadcast(acceptRequest);
+                writeDebug("Sent Accept Request to Proposers: " + ", proposal: " + proposal.toString());
             }
 
             // record the new counter
@@ -429,8 +434,10 @@ public class Node {
 
             // Broadcast decision to all
             AcceptConfirmMessage acceptConfirmMessage = new AcceptConfirmMessage(position, requestedProposal);
+            acceptConfirmMessage.setSender(nodeInformation);
             //broadcast(acceptConfirmMessage);
             unicast(m.getSender(),acceptConfirmMessage);
+            writeDebug("Sent Accept Confirm to " + m.getSender() + ": " + (requestedProposal == null ? "None" : requestedProposal.toString()));
         }
 
         // Proposers learn the decision
