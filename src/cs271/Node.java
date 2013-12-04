@@ -597,9 +597,9 @@ public class Node {
             expireTime = System.currentTimeMillis() + proposeTimeout;
             while(alive) {
                 if(expireTime < System.currentTimeMillis()) {
-                    if (!Tweets.containsKey(proposal.getPosition())){
+                    //if (!Tweets.containsKey(proposal.getPosition())){
                         server.sendToClient("Timeout, not accepted!");
-                    }
+                    //}
                     suicide();
                 }
                 yield(); // so the while loop doesn't spin too much
